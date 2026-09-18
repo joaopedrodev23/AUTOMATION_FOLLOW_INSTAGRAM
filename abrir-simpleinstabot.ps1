@@ -643,14 +643,32 @@ if (-not $Exe) {
     $null = Preparar-Runtime-Estavel
 }
 
+if (-not $Usuario -or $Usuario -eq 'SEU_USUARIO_INSTAGRAM') {
+    Write-Host ""
+    $inputUser = Read-Host "Digite seu usuario do Instagram (sem @)"
+    if ($inputUser) {
+        $Usuario = $inputUser.Trim().TrimStart('@')
+        $usuariosFontePreferidos = @($Usuario)
+        $usuariosMigracao = $usuariosFontePreferidos
+    }
+}
+
 $exeBot = Achar-Exe-SimpleInstaBot -Preferido $Exe
 if (-not $exeBot) {
     Write-Host ""
-    Write-Host "Nao achei o executavel do SimpleInstaBot." -ForegroundColor Yellow
-    Write-Host "Opcoes:"
-    Write-Host "  1. Passe o caminho com -Exe 'C:\caminho\para\SimpleInstaBot-win.exe'"
-    Write-Host "  2. Coloque o .exe em: $env:USERPROFILE\Documents\SimpleInstaBot\"
-    exit 1
+    Write-Host "==================================================================" -ForegroundColor Yellow
+    Write-Host " Nao encontramos o arquivo 'SimpleInstaBot-win.exe' no seu PC!" -ForegroundColor Yellow
+    Write-Host "==================================================================" -ForegroundColor Yellow
+    Write-Host " Abrindo a pagina de download oficial no seu navegador..." -ForegroundColor Cyan
+    Write-Host " Baixe o arquivo 'SimpleInstaBot-win.exe' e coloque nesta mesma pasta." -ForegroundColor Cyan
+    Write-Host ""
+    Start-Process "https://github.com/mifi/SimpleInstaBot/releases"
+    Read-Host "Apos baixar e colocar o arquivo na pasta, pressione ENTER para tentar novamente..."
+    $exeBot = Achar-Exe-SimpleInstaBot -Preferido $Exe
+    if (-not $exeBot) {
+        Write-Host "Ainda nao encontrei o .exe. Baixe o SimpleInstaBot-win.exe e tente novamente!" -ForegroundColor Red
+        exit 1
+    }
 }
 
 $asarDoExe = Join-Path (Split-Path -Parent $exeBot) 'resources\app.asar'
