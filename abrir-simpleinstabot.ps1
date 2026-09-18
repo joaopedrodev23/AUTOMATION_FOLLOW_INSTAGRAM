@@ -659,10 +659,10 @@ if (-not $exeBot) {
     Write-Host "==================================================================" -ForegroundColor Yellow
     Write-Host " Nao encontramos o arquivo 'SimpleInstaBot-win.exe' no seu PC!" -ForegroundColor Yellow
     Write-Host "==================================================================" -ForegroundColor Yellow
-    Write-Host " Abrindo a pagina de download oficial no seu navegador..." -ForegroundColor Cyan
-    Write-Host " Baixe o arquivo 'SimpleInstaBot-win.exe' e coloque nesta mesma pasta." -ForegroundColor Cyan
+    Write-Host " Abrindo a pagina de download das Releases no seu navegador..." -ForegroundColor Cyan
+    Write-Host " Baixe o 'SimpleInstaBot-win.exe' e coloque nesta mesma pasta." -ForegroundColor Cyan
     Write-Host ""
-    Start-Process "https://github.com/mifi/SimpleInstaBot/releases"
+    Start-Process "https://github.com/joaopedrodev23/AUTOMATION_FOLLOW_INSTAGRAM/releases"
     Read-Host "Apos baixar e colocar o arquivo na pasta, pressione ENTER para tentar novamente..."
     $exeBot = Achar-Exe-SimpleInstaBot -Preferido $Exe
     if (-not $exeBot) {
