@@ -702,3 +702,4 @@ Write-Host ""
 Write-Host "SimpleInstaBot aberto depois do reparo." -ForegroundColor Green
 Write-Host "Eu nao apertei Start, nao fiz login e nao publiquei nada."
 Write-Host ""
+
