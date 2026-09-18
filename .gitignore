@@ -1,0 +1,22 @@
+# Logs e backups gerados pelo wrapper
+*.bak-*
+*.log
+
+# Dados do SimpleInstaBot (nao versionar — contem historico de follows)
+followed.json
+unfollowed.json
+liked-photos.json
+config.json
+cookies.json
+
+# Pasta de runtime local (criada automaticamente)
+SimpleInstaBot-codex-runtime/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
