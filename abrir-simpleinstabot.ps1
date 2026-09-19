@@ -143,7 +143,17 @@ function Corrigir-JsonHtmlDoApp([string]$ExeLocal) {
     }
 
     $meuAsarFonte = Join-Path $PSScriptRoot 'resources\app.asar'
-    if ((Test-Path -LiteralPath $meuAsarFonte) -and ((Resolve-Path -LiteralPath $asar).Path -ne (Resolve-Path -LiteralPath $meuAsarFonte).Path)) {
+    if (-not (Test-Path -LiteralPath $meuAsarFonte) -or (Get-Item -LiteralPath $meuAsarFonte).Length -lt 10000000) {
+        Write-Host "  Baixando pacote corrigido do SimpleInstaBot (app.asar)..." -ForegroundColor Cyan
+        try {
+            $urlAsar = "https://media.githubusercontent.com/media/joaopedrodev23/AUTOMATION_FOLLOW_INSTAGRAM/main/resources/app.asar"
+            New-Item -ItemType Directory -Force -Path (Join-Path $PSScriptRoot 'resources') | Out-Null
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -Uri $urlAsar -OutFile $meuAsarFonte -UseBasicParsing
+        } catch {}
+    }
+
+    if ((Test-Path -LiteralPath $meuAsarFonte) -and ((Get-Item -LiteralPath $meuAsarFonte).Length -gt 10000000) -and ((Resolve-Path -LiteralPath $asar).Path -ne (Resolve-Path -LiteralPath $meuAsarFonte).Path)) {
         $hashAlvo = (Get-FileHash -LiteralPath $asar -Algorithm SHA256).Hash
         $hashFonte = (Get-FileHash -LiteralPath $meuAsarFonte -Algorithm SHA256).Hash
         if ($hashAlvo -ne $hashFonte) {
@@ -501,7 +511,9 @@ function Achar-Exe-SimpleInstaBot {
 
     foreach ($candidato in $candidatos) {
         if ($candidato -and (Test-Path -LiteralPath $candidato)) {
-            return (Resolve-Path -LiteralPath $candidato).Path
+            if ((Get-Item -LiteralPath $candidato).Length -gt 10000000) {
+                return (Resolve-Path -LiteralPath $candidato).Path
+            }
         }
     }
 
@@ -515,6 +527,7 @@ function Achar-Exe-SimpleInstaBot {
         if (-not (Test-Path -LiteralPath $raiz)) { continue }
 
         $achado = Get-ChildItem -LiteralPath $raiz -Recurse -Filter 'SimpleInstaBot*.exe' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Length -gt 10000000 } |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
 
@@ -668,17 +681,34 @@ $exeBot = Achar-Exe-SimpleInstaBot -Preferido $Exe
 if (-not $exeBot) {
     Write-Host ""
     Write-Host "==================================================================" -ForegroundColor Yellow
-    Write-Host " Nao encontramos o arquivo 'SimpleInstaBot-win.exe' no seu PC!" -ForegroundColor Yellow
+    Write-Host "  Executavel do SimpleInstaBot nao encontrado localmente." -ForegroundColor Yellow
+    Write-Host "  Baixando o SimpleInstaBot oficial automaticamente (~160MB)..." -ForegroundColor Cyan
     Write-Host "==================================================================" -ForegroundColor Yellow
-    Write-Host " Abrindo a pagina de download das Releases no seu navegador..." -ForegroundColor Cyan
-    Write-Host " Baixe o 'SimpleInstaBot-win.exe' e coloque nesta mesma pasta." -ForegroundColor Cyan
-    Write-Host ""
-    Start-Process "https://github.com/joaopedrodev23/AUTOMATION_FOLLOW_INSTAGRAM/releases"
-    Read-Host "Apos baixar e colocar o arquivo na pasta, pressione ENTER para tentar novamente..."
-    $exeBot = Achar-Exe-SimpleInstaBot -Preferido $Exe
+    $urlExe = "https://github.com/mifi/SimpleInstaBot/releases/download/SimpleInstaBot/v1.11.16/SimpleInstaBot-win.exe"
+    $destinoExe = Join-Path $PSScriptRoot 'SimpleInstaBot-win.exe'
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $urlExe -OutFile $destinoExe -UseBasicParsing
+        if ((Test-Path -LiteralPath $destinoExe) -and (Get-Item -LiteralPath $destinoExe).Length -gt 10000000) {
+            Write-Host "  Download concluido com sucesso!" -ForegroundColor Green
+            $exeBot = (Resolve-Path -LiteralPath $destinoExe).Path
+        }
+    } catch {
+        Write-Host "  Falha no download automatico: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+
     if (-not $exeBot) {
-        Write-Host "Ainda nao encontrei o .exe. Baixe o SimpleInstaBot-win.exe e tente novamente!" -ForegroundColor Red
-        exit 1
+        Write-Host ""
+        Write-Host " Abrindo a pagina de download das Releases no seu navegador..." -ForegroundColor Cyan
+        Write-Host " Baixe o 'SimpleInstaBot-win.exe' e coloque nesta mesma pasta." -ForegroundColor Cyan
+        Write-Host ""
+        Start-Process "https://github.com/mifi/SimpleInstaBot/releases/tag/SimpleInstaBot%2Fv1.11.16"
+        Read-Host "Apos baixar e colocar o arquivo na pasta, pressione ENTER para tentar novamente..."
+        $exeBot = Achar-Exe-SimpleInstaBot -Preferido $Exe
+        if (-not $exeBot) {
+            Write-Host "Ainda nao encontrei o .exe. Baixe o SimpleInstaBot-win.exe e tente novamente!" -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
