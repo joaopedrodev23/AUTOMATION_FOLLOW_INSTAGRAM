@@ -1,7 +1,7 @@
-# SimpleInstaBot Wrapper
+# SimpleInstaBot Wrapper & Patches
 
-> **Abre o [SimpleInstaBot](https://github.com/mifi/SimpleInstaBot) sem quebrar.**  
-> Wrapper PowerShell que repara os bugs de sessão automaticamente toda vez que você abre o app.
+> **Abre e roda o [SimpleInstaBot](https://github.com/mifi/SimpleInstaBot) 100% atualizado para 2026.**  
+> Repara bugs de login, seletores em Português, coleta moderna de seguidores (REST API + modal fallback) e banco de dados local.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://github.com/joaopedrodev23/AUTOMATION_FOLLOW_INSTAGRAM)
@@ -9,141 +9,90 @@
 
 ---
 
-## O problema
+## 🚀 O que foi corrigido nesta versão
 
-O SimpleInstaBot é ótimo, mas tem dois bugs chatos que aparecem toda hora:
+O projeto original do SimpleInstaBot foi abandonado há alguns anos e começou a falhar com as mudanças do Instagram. Esta versão inclui correções completas:
 
-| Bug | Sintoma | Causa |
-|-----|---------|-------|
-| **ENOENT ao reabrir** | Bot fecha sozinho logo depois de abrir | Ao deslogar, o app apaga os JSONs de controle. Na próxima abertura ele procura e não acha |
-| **Tela branca / crash** | Bot para no meio do follow | O Instagram retorna HTML em endpoints que o bot espera JSON — derruba a sessão |
-
-Este wrapper resolve **os dois** antes de abrir o app, sem tocar em senha, cookie ou config.
-
----
-
-## Como funciona
-
-```
-você clica no atalho
-       │
-       ▼
-wrapper repara followed.json, unfollowed.json, liked-photos.json
-       │
-       ▼
-wrapper aplica patch no app.asar (fix do HTML inesperado)
-       │
-       ▼
-SimpleInstaBot abre normalmente ✓
-```
+| Problema Antigo | Sintoma | Solução Implementada |
+|-----------------|---------|----------------------|
+| **0 seguidores seguidos** | Robô finalizava o lote sem seguir ninguém (`User followers batch []`) | A query GraphQL legada foi desativada pelo Instagram. Implementamos **coleta dupla**: API REST `/api/v1/friendships` autenticada + scraping visual do modal de seguidores (`div[role="dialog"]`). |
+| **Idioma em Português** | Botões não eram encontrados | Suporte nativo aos seletores em português (`Seguir`, `Seguindo`, `Curtir`, `Fechar`, contadores em `mil`, etc.). |
+| **Erro `dest already exists.`** | Pop-up de erro ao clicar em Start | Migração segura do banco de dados de histórico (`initInstautoDb`), tratando arquivos existentes sem conflito. |
+| **ENOENT / Crash ao abrir** | Bot fecha sozinho logo ao iniciar | Script reparador que recria e valida os JSONs em `%APPDATA%\SimpleInstaBot` automaticamente. |
+| **Prompt "abre e fecha"** | `abrir-simpleinstabot.cmd` fechava instantaneamente | Correção de variáveis de ambiente (`ELECTRON_RUN_AS_NODE`), desvinculação limpa de processos e controle de fluxo seguro com confirmação visual. |
 
 ---
 
-## Instalação
+## 🛠️ Como Usar
 
-### 1. Baixe o SimpleInstaBot
-
-👉 [github.com/mifi/SimpleInstaBot/releases](https://github.com/mifi/SimpleInstaBot/releases)
-
-Baixe o `SimpleInstaBot-win.exe` e coloque em qualquer pasta. O wrapper acha automaticamente.
-
-### 2. Clone este repositório
-
+### 1. Clonar o repositório
 ```cmd
 git clone https://github.com/joaopedrodev23/AUTOMATION_FOLLOW_INSTAGRAM.git
 cd AUTOMATION_FOLLOW_INSTAGRAM
 ```
 
-### 3. Configure seu usuário
-
-Abra `abrir-simpleinstabot.ps1` e edite a linha:
-
-```powershell
-[string]$Usuario = 'SEU_USUARIO_INSTAGRAM'
+### 2. Abrir o programa
+Basta dar duplo clique em:
+```text
+abrir-simpleinstabot.cmd
 ```
+O script cuidará de tudo:
+1. Valida e prepara os arquivos de banco de dados (`followed.json`, etc.).
+2. Sincroniza o pacote corrigido (`resources/app.asar`).
+3. Inicia o aplicativo e confirma a inicialização no terminal.
 
-Substitua `SEU_USUARIO_INSTAGRAM` pelo seu usuário do Instagram (sem @).
-
-### 4. Pronto — dê duplo clique
-
-```
-abrir-simpleinstabot.cmd  ← duplo clique aqui
-```
-
-Se o Windows perguntar sobre política de execução, clique em **Executar assim mesmo**.
+> 💡 **Dica:** Você também pode usar o script auxiliar `importar-sessao.cmd` caso seu Instagram exija verificação ou CAPTCHA no navegador. Ele permite colar o cookie `sessionid` para entrar diretamente conectado!
 
 ---
 
-## Uso via terminal
+## 💻 Uso via Terminal (Opcional)
 
 ```powershell
-# Abrir normalmente
-.\abrir-simpleinstabot.ps1 -Usuario minha.conta
+# Abrir normalmente passando o usuário desejado
+.\abrir-simpleinstabot.ps1 -Usuario seu.usuario
 
-# Fechar instâncias travadas e reabrir
+# Fechar processos travados e reabrir do zero
 .\abrir-simpleinstabot.ps1 -Reiniciar
 
-# Só reparar os arquivos, sem abrir o bot
+# Apenas reparar os arquivos locais sem abrir o app
 .\abrir-simpleinstabot.ps1 -CorrigirSomente
-
-# Especificar o caminho do .exe manualmente
-.\abrir-simpleinstabot.ps1 -Exe "C:\Downloads\SimpleInstaBot-win.exe"
 ```
 
 ---
 
-## Parâmetros
+## ⚙️ Parâmetros do Script
 
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-----------|
-| `-Usuario` | string | Seu usuário do Instagram (sem @) |
-| `-Exe` | string | Caminho para o `.exe` se não for encontrado automaticamente |
-| `-Reiniciar` | switch | Fecha instâncias existentes antes de abrir |
-| `-CorrigirSomente` | switch | Repara os arquivos sem abrir o bot |
+| `-Usuario` | string | Usuário do Instagram alvo (sem @). Se omitido, detecta do `config.json` ou solicita na tela. |
+| `-Exe` | string | Caminho alternativo para o executável `SimpleInstaBot.exe` caso esteja em outro local. |
+| `-Reiniciar` | switch | Encerra instâncias antigas antes de iniciar. |
+| `-CorrigirSomente` | switch | Apenas valida/repara os JSONs sem iniciar o executável. |
 
 ---
 
-## O que o wrapper faz
+## 📁 Onde os dados são salvos
 
-✅ Garante que `followed.json`, `unfollowed.json` e `liked-photos.json` existam e sejam JSON válido  
-✅ Faz backup automático antes de reparar qualquer arquivo corrompido  
-✅ Aplica patch no `app.asar` do Electron para tratar respostas HTML sem derrubar o bot  
-✅ Aguarda até 90 segundos pela extração do pacote e aplica o patch na pasta temporária nova  
-✅ Recarrega a janela automaticamente via DevTools protocol após aplicar o patch  
-
-## O que o wrapper NÃO faz
-
-❌ Não toca em senha, cookie ou `config.json`  
-❌ Não faz login automático  
-❌ Não aperta Start  
-❌ Não publica nada  
-
----
-
-## Onde o SimpleInstaBot salva os dados
-
-```
+Os bancos de dados e preferências ficam na pasta padrão do usuário no Windows:
+```text
 %APPDATA%\SimpleInstaBot\
 ```
-
-Os JSONs de controle ficam aqui. O wrapper cria e repara esses arquivos automaticamente.
-
----
-
-## Requisitos
-
-- Windows 10 / 11
-- PowerShell 5.1 ou superior *(já vem no Windows — não precisa instalar nada)*
-- [SimpleInstaBot](https://github.com/mifi/SimpleInstaBot/releases) baixado
+Arquivos gerenciados:
+- `<usuario>-followed.json`
+- `<usuario>-unfollowed.json`
+- `<usuario>-liked-photos.json`
+- `config.json`
 
 ---
 
-## Créditos
+## 🛡️ Segurança e Privacidade
 
-- [SimpleInstaBot](https://github.com/mifi/SimpleInstaBot) por [@mifi](https://github.com/mifi) — MIT License
+- **100% Open Source**: Nenhum dado sensível, senha ou token fica salvo no repositório.
+- **Armazenamento Local**: Suas credenciais e cookies ficam apenas na sua máquina local (`%APPDATA%`).
+- O bot roda diretamente pelo Chromium/Electron do seu computador.
 
 ---
 
-## Licença
+## 📜 Licença
 
-[MIT](LICENSE) — use, modifique e distribua à vontade.
+Distribuído sob a licença [MIT](LICENSE). Sinta-se livre para usar, estudar e aprimorar.

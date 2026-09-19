@@ -2,15 +2,23 @@
 *.bak-*
 *.log
 
-# Dados do SimpleInstaBot (nao versionar — contem historico de follows)
+# Dados do SimpleInstaBot (nao versionar — contem historico de follows e sessoes)
 followed.json
 unfollowed.json
 liked-photos.json
 config.json
 cookies.json
+*-followed.json
+*-unfollowed.json
+*-liked-photos.json
 
-# Pasta de runtime local (criada automaticamente)
+# Atalhos locais do Windows
+*.lnk
+
+# Pastas de runtime e desenvolvimento local
 SimpleInstaBot-codex-runtime/
+app/
+scratch/
 
 # Windows
 Thumbs.db
@@ -20,4 +28,3 @@ desktop.ini
 .vscode/
 .idea/
 *.swp
-

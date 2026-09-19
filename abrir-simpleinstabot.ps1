@@ -34,13 +34,26 @@ param(
     [switch]$CorrigirSomente,
     [switch]$Reiniciar,
     [string]$Exe = '',
-    [string]$Usuario = 'SEU_USUARIO_INSTAGRAM'
+    [string]$Usuario = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
 $appDir = Join-Path $env:APPDATA 'SimpleInstaBot'
 $runtimeDir = Join-Path $env:LOCALAPPDATA 'SimpleInstaBot-codex-runtime'
+
+if (-not $Usuario -or $Usuario -eq 'SEU_USUARIO_INSTAGRAM') {
+    $configFile = Join-Path $appDir 'config.json'
+    if (Test-Path -LiteralPath $configFile) {
+        try {
+            $cfg = Get-Content -LiteralPath $configFile -Raw | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($cfg -and $cfg.currentUsername) {
+                $Usuario = $cfg.currentUsername
+            }
+        } catch {}
+    }
+}
+
 $jsonsObrigatorios = @(
     'followed.json',
     'unfollowed.json',
@@ -127,6 +140,18 @@ function Corrigir-JsonHtmlDoApp([string]$ExeLocal) {
     if (-not (Test-Path -LiteralPath $asar)) {
         Write-Host "  patch app: app.asar nao encontrado, pulando"
         return "sem-app-asar"
+    }
+
+    $meuAsarFonte = Join-Path $PSScriptRoot 'resources\app.asar'
+    if ((Test-Path -LiteralPath $meuAsarFonte) -and ((Resolve-Path -LiteralPath $asar).Path -ne (Resolve-Path -LiteralPath $meuAsarFonte).Path)) {
+        $hashAlvo = (Get-FileHash -LiteralPath $asar -Algorithm SHA256).Hash
+        $hashFonte = (Get-FileHash -LiteralPath $meuAsarFonte -Algorithm SHA256).Hash
+        if ($hashAlvo -ne $hashFonte) {
+            Copy-Item -LiteralPath $meuAsarFonte -Destination $asar -Force
+            Write-Host "  patch app: app.asar sincronizado com correcao completa!" -ForegroundColor Green
+            return "aplicado"
+        }
+        return "ja-aplicado"
     }
 
     $encoding = [System.Text.Encoding]::UTF8
@@ -443,34 +468,17 @@ function Corrigir-App-Se-Possivel([string]$ExeLocal) {
 }
 
 function Preparar-Migracao-Do-Bot {
-    $backupDir = Join-Path $appDir ("_backup_migracao_codex\" + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    $moveuAlgum = $false
-
-    foreach ($nome in $jsonsObrigatorios) {
-        $generico = Join-Path $appDir $nome
-        $fonte = Escolher-Fonte-Historico $nome
-
-        if ($fonte -and ($fonte -ne $generico)) {
-            Copy-Item -LiteralPath $fonte -Destination $generico -Force
-        } elseif (-not (Test-Path -LiteralPath $generico)) {
-            Escrever-Array-Vazio $generico
-        }
-
-        $null = Garantir-Json $generico
-    }
-
     foreach ($usuarioLocal in $usuariosMigracao) {
         foreach ($nome in $jsonsObrigatorios) {
             $destino = Join-Path $appDir "$usuarioLocal-$nome"
-            if (-not (Test-Path -LiteralPath $destino)) { continue }
-
-            if (-not $moveuAlgum) {
-                New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
-                $moveuAlgum = $true
+            $generico = Join-Path $appDir $nome
+            if (Test-Path -LiteralPath $generico) {
+                if (-not (Test-Path -LiteralPath $destino) -or (Get-Item -LiteralPath $destino).Length -le 2) {
+                    Copy-Item -LiteralPath $generico -Destination $destino -Force
+                }
+                Remove-Item -LiteralPath $generico -Force -ErrorAction SilentlyContinue
             }
-
-            Move-Item -LiteralPath $destino -Destination (Join-Path $backupDir (Split-Path -Leaf $destino)) -Force
-            Write-Host ("  colisao guardada em backup: {0}" -f (Split-Path -Leaf $destino))
+            $null = Garantir-Json $destino
         }
     }
 }
@@ -481,9 +489,11 @@ function Achar-Exe-SimpleInstaBot {
     $candidatos = @()
     if ($Preferido) { $candidatos += $Preferido }
 
-    # Adicione aqui o caminho onde voce instalou o SimpleInstaBot-win.exe
     $candidatos += @(
+        (Join-Path $PSScriptRoot 'app\SimpleInstaBot.exe'),
         (Join-Path $runtimeDir 'SimpleInstaBot.exe'),
+        (Join-Path $PSScriptRoot 'SimpleInstaBot.exe'),
+        (Join-Path $PSScriptRoot 'SimpleInstaBot-win.exe'),
         (Join-Path $env:LOCALAPPDATA 'Programs\SimpleInstaBot\SimpleInstaBot.exe'),
         (Join-Path $env:USERPROFILE 'Documents\SimpleInstaBot\SimpleInstaBot-win.exe'),
         (Join-Path $env:USERPROFILE 'Downloads\SimpleInstaBot-win.exe')
@@ -617,13 +627,8 @@ function Aguardar-Extracao-E-Corrigir {
 
 New-Item -ItemType Directory -Force -Path $appDir | Out-Null
 
-$usuariosJaNoDisco = foreach ($nome in $jsonsObrigatorios) {
-    Get-ChildItem -LiteralPath $appDir -File -Filter "*-$nome" -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -notlike '*.bak-*' } |
-        ForEach-Object { $_.Name.Substring(0, $_.Name.Length - $nome.Length - 1) }
-}
-$usuariosMigracao = @($usuariosMigracao + $usuariosJaNoDisco) |
-    Where-Object { $_ } |
+$usuariosMigracao = @($Usuario) |
+    Where-Object { $_ -and $_ -ne 'SEU_USUARIO_INSTAGRAM' } |
     Select-Object -Unique
 
 Write-Host ""
@@ -632,9 +637,15 @@ Write-Host "=== SimpleInstaBot: reparo seguro ==="
 Preparar-Migracao-Do-Bot
 
 foreach ($nome in $jsonsObrigatorios) {
-    $caminho = Join-Path $appDir $nome
-    $status = Garantir-Json $caminho
-    Write-Host ("  {0}: {1}" -f $nome, $status)
+    if ($Usuario) {
+        $caminho = Join-Path $appDir "$Usuario-$nome"
+        $status = Garantir-Json $caminho
+        Write-Host ("  {0}: {1}" -f "$Usuario-$nome", $status)
+    } else {
+        $caminho = Join-Path $appDir $nome
+        $status = Garantir-Json $caminho
+        Write-Host ("  {0}: {1}" -f $nome, $status)
+    }
 }
 
 Corrigir-Apps-Extraidos
@@ -689,35 +700,45 @@ if ($Reiniciar) {
     Start-Sleep -Milliseconds 800
 }
 
-$electronRunAsNodeAnterior = $env:ELECTRON_RUN_AS_NODE
-try {
-    Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
-    $processo = Start-Process -FilePath $exeBot -WorkingDirectory (Split-Path -Parent $exeBot) -PassThru
-} finally {
-    if ($null -eq $electronRunAsNodeAnterior) {
-        Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
-    } else {
-        $env:ELECTRON_RUN_AS_NODE = $electronRunAsNodeAnterior
+Remove-Item Env:ELECTRON_RUN_AS_NODE -Force -ErrorAction SilentlyContinue
+try { [System.Environment]::SetEnvironmentVariable('ELECTRON_RUN_AS_NODE', $null, [System.EnvironmentVariableTarget]::Process) } catch {}
+try { [System.Environment]::SetEnvironmentVariable('ELECTRON_RUN_AS_NODE', $null, [System.EnvironmentVariableTarget]::User) } catch {}
+
+Write-Host "Iniciando SimpleInstaBot ($exeBot)..." -ForegroundColor Cyan
+
+$psi = New-Object System.Diagnostics.ProcessStartInfo
+$psi.FileName = $exeBot
+$psi.WorkingDirectory = (Split-Path -Parent $exeBot)
+$psi.UseShellExecute = $true
+
+$processo = [System.Diagnostics.Process]::Start($psi)
+
+if ($exeBot -like '*SimpleInstaBot-win.exe') {
+    $temAppExtraido = Aguardar-Extracao-E-Corrigir -TimeoutSegundos 90
+} else {
+    $temAppExtraido = $true
+}
+
+$rodando = $false
+for ($i = 0; $i -lt 10; $i++) {
+    Start-Sleep -Milliseconds 500
+    $processosBot = @(Get-Process -Name 'SimpleInstaBot*' -ErrorAction SilentlyContinue)
+    if ($processosBot.Count -gt 0) {
+        $rodando = $true
+        break
     }
 }
 
-$temAppExtraido = Aguardar-Extracao-E-Corrigir -TimeoutSegundos 90
-
-$processosBot = @(Listar-Processos-SimpleInstaBot)
-
-if ($processo.HasExited -and -not $processosBot) {
+if (-not $rodando) {
     Write-Host ""
-    Write-Host "O SimpleInstaBot abriu e fechou logo em seguida." -ForegroundColor Yellow
-    Write-Host "Os arquivos locais foram reparados; tente abrir de novo pelo atalho seguro."
+    Write-Host "[AVISO] O processo do SimpleInstaBot nao foi detectado apos iniciar." -ForegroundColor Yellow
+    Write-Host "Tente abrir diretamente clicando duas vezes no atalho 'SimpleInstaBot.lnk' nesta mesma pasta." -ForegroundColor Cyan
     exit 1
 }
 
-if (-not $temAppExtraido) {
-    Write-Host "Nao consegui confirmar o app.asar temporario ativo; se aparecer erro antigo, rode este wrapper de novo." -ForegroundColor Yellow
-}
-
 Write-Host ""
-Write-Host "SimpleInstaBot aberto depois do reparo." -ForegroundColor Green
-Write-Host "Eu nao apertei Start, nao fiz login e nao publiquei nada."
+Write-Host "SimpleInstaBot aberto com sucesso!" -ForegroundColor Green
+Write-Host "Processos ativos: $($processosBot.Count)" -ForegroundColor Green
+Write-Host "A janela do bot deve estar visivel na sua tela agora." -ForegroundColor Cyan
 Write-Host ""
 
